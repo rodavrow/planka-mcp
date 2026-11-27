@@ -9,8 +9,8 @@ import {
   CreateCommentInput,
   UpdateCommentInput,
 } from "../schemas/requests.js";
-import { CommentResponse } from "../schemas/responses.js";
-import { getCard } from "./cards.js";
+import { CommentResponse, CommentsResponse } from "../schemas/responses.js";
+import { PlankaError } from "../errors.js";
 
 /**
  * Add a comment to a card.
@@ -55,10 +55,32 @@ export async function deleteComment(commentId: string): Promise<void> {
 }
 
 /**
- * Get all comments for a card.
- * Comments are included when fetching card details.
+ * Get all comments for a card, newest first.
+ *
+ * PLANKA 2.0 does not include comments in GET /cards/:id; they come from
+ * GET /cards/:cardId/comments, one page at a time. Each page is newest first,
+ * and the next page is requested with ?beforeId=<oldest id so far> until a page is empty.
  */
 export async function getCommentsForCard(cardId: string): Promise<Comment[]> {
-  const cardDetails = await getCard(cardId);
-  return cardDetails.comments;
+  const comments: Comment[] = [];
+  let beforeId: string | undefined;
+
+  for (;;) {
+    const query = beforeId === undefined ? "" : `?beforeId=${encodeURIComponent(beforeId)}`;
+    const response = await plankaClient.get<unknown>(`/api/cards/${cardId}/comments${query}`);
+    const page = CommentsResponse.parse(response).items;
+    if (page.length === 0) return comments;
+
+    const oldestId = page[page.length - 1].id;
+    if (oldestId === beforeId) {
+      // A server that ignores beforeId would otherwise make this loop forever.
+      throw new PlankaError(
+        `Comment pagination for card ${cardId} did not advance past comment ${oldestId}`,
+        "PAGINATION_ERROR",
+        502
+      );
+    }
+    comments.push(...page);
+    beforeId = oldestId;
+  }
 }
