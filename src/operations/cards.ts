@@ -12,6 +12,7 @@ import {
   MoveCardInput,
 } from "../schemas/requests.js";
 import { CardResponse, CardIncludedSchema } from "../schemas/responses.js";
+import { getCommentsForCard } from "./comments.js";
 
 /**
  * Card details with all related entities.
@@ -51,7 +52,10 @@ export async function createCard(input: CreateCardInput): Promise<Card> {
  * Get a card by ID with all related entities.
  */
 export async function getCard(cardId: string): Promise<CardDetails> {
-  const response = await plankaClient.get<unknown>(`/api/cards/${cardId}`);
+  const [response, comments] = await Promise.all([
+    plankaClient.get<unknown>(`/api/cards/${cardId}`),
+    getCommentsForCard(cardId),
+  ]);
   const parsed = CardResponse.parse(response);
   const included = CardIncludedSchema.parse(
     (response as Record<string, unknown>).included || {}
@@ -61,9 +65,7 @@ export async function getCard(cardId: string): Promise<CardDetails> {
     card: parsed.item,
     taskLists: (included.taskLists || []).sort((a, b) => a.position - b.position),
     tasks: (included.tasks || []).sort((a, b) => a.position - b.position),
-    comments: (included.comments || []).sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ),
+    comments,
     labels: included.labels || [],
     cardLabels: included.cardLabels || [],
     attachments: included.attachments || [],

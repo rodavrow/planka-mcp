@@ -111,6 +111,7 @@ All subsequent requests include `Authorization: Bearer <token>`.
 | DELETE | `/labels/:id` | Delete label |
 | POST | `/cards/:cardId/card-labels` | Add label to card (2.0) |
 | DELETE | `/cards/:cardId/card-labels/:cardLabelId` | Remove label (2.0) |
+| GET | `/cards/:cardId/comments` | List comments (paginated, `?beforeId=`) |
 | POST | `/cards/:cardId/comments` | Add comment |
 | PATCH | `/comments/:id` | Update comment |
 | DELETE | `/comments/:id` | Delete comment |
